@@ -10,16 +10,17 @@ This repository contains both the client and server applications:
 
 *   **/src/frontend**: React + TypeScript client. Provides the dashboard for operators to view leads, adjust pricing formulas, and manage RBAC (Role-Based Access Control) user settings.
 *   **/src/backend**: C# / .NET 10 Web API. Handles webhook ingestion, Entity Framework Core multi-tenant data isolation, pricing logic, and Twilio API integrations.
-*   **Database**: MySQL (Containerized for local development).
+*   **Database**: PostgreSQL (containerized for local development), accessed through the `Npgsql.EntityFrameworkCore.PostgreSQL` provider.
 
 ## 📂 Project Structure
 
 ```text
 mercury/
 ├── src/
-│   ├── backend/          # .NET 10 Solution and API projects
-│   └── frontend/         # React application (Vite / Create React App)
-├── docker-compose.yml    # Spins up local MySQL database and dependencies
+│   ├── backend/          # .NET 10 solution and API projects
+│   └── frontend/         # React application (Vite)
+├── docker-compose.yml    # Spins up the local PostgreSQL database and dependencies
+├── mercury_ai_spec.md    # Engineering specification: stack, entities, security rules
 └── README.md
 ```
 
