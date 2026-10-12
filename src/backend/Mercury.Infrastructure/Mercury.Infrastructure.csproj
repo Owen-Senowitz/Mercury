@@ -1,0 +1,7 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Mercury.Core\Mercury.Core.csproj" />
+  </ItemGroup>
+
+</Project>

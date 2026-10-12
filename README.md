@@ -9,7 +9,7 @@ When a prospect submits a request (via Thumbtack, web form, etc.), Mercury inges
 This repository contains both the client and server applications:
 
 *   **/src/frontend**: React + TypeScript client. Provides the dashboard for operators to view leads, adjust pricing formulas, and manage RBAC (Role-Based Access Control) user settings.
-*   **/src/backend**: C# / .NET 8 Web API. Handles webhook ingestion, Entity Framework Core multi-tenant data isolation, pricing logic, and Twilio API integrations.
+*   **/src/backend**: C# / .NET 10 Web API. Handles webhook ingestion, Entity Framework Core multi-tenant data isolation, pricing logic, and Twilio API integrations.
 *   **Database**: MySQL (Containerized for local development).
 
 ## 📂 Project Structure
@@ -17,7 +17,29 @@ This repository contains both the client and server applications:
 ```text
 mercury/
 ├── src/
-│   ├── backend/          # .NET 8 Solution and API projects
+│   ├── backend/          # .NET 10 Solution and API projects
 │   └── frontend/         # React application (Vite / Create React App)
 ├── docker-compose.yml    # Spins up local MySQL database and dependencies
 └── README.md
+```
+
+## Backend
+
+Install the .NET SDK version pinned in `global.json` (10.0.401).
+Shared compiler settings are defined in `Directory.Build.props`, including warnings as errors.
+
+* **Mercury.Api**: ASP.NET Core composition root, endpoints, and middleware; references Core and Infrastructure.
+* **Mercury.Core**: Entities, enums, and interfaces; no infrastructure dependencies.
+* **Mercury.Infrastructure**: Home for the future EF Core `AppDbContext`, Twilio client, and Stripe client; references Core.
+* **Mercury.Tests**: xUnit test project; references Api, Core, and Infrastructure. No tests are defined yet.
+
+From the repository root:
+
+```sh
+dotnet build src/backend/Mercury.sln
+dotnet test src/backend/Mercury.sln
+dotnet run --project src/backend/Mercury.Api
+```
+
+Alternatively, run `dotnet build` and `dotnet test` from `src/backend`.
+The scaffold does not yet expose application endpoints.
