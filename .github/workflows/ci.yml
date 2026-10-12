@@ -1,0 +1,184 @@
+# Mercury CI — quality gate for every pull request into main.
+# Owner: @Owen-Senowitz
+# Purpose: build and test the .NET 10 backend and the React client, and fail the PR on
+# build errors, failing tests, or high-severity dependency vulnerabilities.
+# The detect job lets this run cleanly while parts of the monorepo are still being scaffolded.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detect:
+    name: Detect which stacks are present
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.check.outputs.backend }}
+      frontend: ${{ steps.check.outputs.frontend }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Look for the backend solution and frontend package manifest
+        id: check
+        shell: bash
+        run: |
+          if [ -f src/backend/Mercury.sln ]; then
+            echo "backend=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "backend=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No src/backend/Mercury.sln yet — skipping backend jobs."
+          fi
+          if [ -f src/frontend/package.json ]; then
+            echo "frontend=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "frontend=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No src/frontend/package.json yet — skipping frontend jobs."
+          fi
+
+  backend:
+    name: Backend build and test (.NET 10)
+    needs: detect
+    if: needs.detect.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up the .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/Directory.Packages.props') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore NuGet dependencies
+        run: dotnet restore src/backend/Mercury.sln
+
+      - name: Build the solution with warnings treated as errors
+        run: dotnet build src/backend/Mercury.sln --configuration Release --no-restore
+
+      - name: Run all backend tests with code coverage
+        run: >
+          dotnet test src/backend/Mercury.sln
+          --configuration Release
+          --no-build
+          --results-directory TestResults
+          --logger "trx;LogFileName=backend-tests.trx"
+          --collect:"XPlat Code Coverage"
+
+      - name: Publish test results as a build artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: TestResults/
+          retention-days: 14
+
+  frontend:
+    name: Frontend lint, type-check, test and build
+    needs: detect
+    if: needs.detect.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/frontend
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js with npm caching
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - name: Install dependencies from the lockfile
+        run: npm ci
+
+      - name: Lint
+        run: npm run --if-present lint
+
+      - name: Type-check
+        run: npm run --if-present typecheck
+
+      - name: Run all frontend tests
+        run: npm run --if-present test -- --run
+
+      - name: Build the production bundle
+        run: npm run --if-present build
+
+  dependency-audit:
+    name: Dependency vulnerability audit
+    needs: detect
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up the .NET 10 SDK
+        if: needs.detect.outputs.backend == 'true'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Fail on vulnerable NuGet packages
+        if: needs.detect.outputs.backend == 'true'
+        shell: bash
+        run: |
+          dotnet restore src/backend/Mercury.sln
+          report=$(dotnet list src/backend/Mercury.sln package --vulnerable --include-transitive)
+          echo "$report"
+          if echo "$report" | grep -qE '\b(High|Critical)\b'; then
+            echo "::error::High or critical severity NuGet vulnerabilities found."
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        if: needs.detect.outputs.frontend == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Fail on vulnerable npm packages
+        if: needs.detect.outputs.frontend == 'true'
+        working-directory: src/frontend
+        run: npm audit --audit-level=high
+
+  # Single aggregate check to require in branch protection, so the required-check
+  # configuration does not need updating as jobs are added or skipped.
+  ci-status:
+    name: CI status
+    needs: [backend, frontend, dependency-audit]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any upstream job failed or was cancelled
+        shell: bash
+        run: |
+          results="${{ join(needs.*.result, ' ') }}"
+          echo "Upstream job results: $results"
+          for r in $results; do
+            if [ "$r" = "failure" ] || [ "$r" = "cancelled" ]; then
+              echo "::error::CI failed."
+              exit 1
+            fi
+          done
+          echo "CI passed."
