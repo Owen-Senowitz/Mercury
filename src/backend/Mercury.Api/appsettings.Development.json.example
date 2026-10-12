@@ -1,0 +1,28 @@
+{
+  "//": "Reference template showing every configuration key the API binds and validates at startup.",
+  "//secrets": "Do NOT put real secrets in appsettings.Development.json - that file is committed. Use: dotnet user-secrets --project src/backend/Mercury.Api set \"<key>\" \"<value>\"",
+
+  "Database": {
+    "ConnectionString": "Host=localhost;Port=5432;Database=mercury;Username=mercury_app;Password=<see .env>",
+    "MaxRetryCount": 3,
+    "CommandTimeoutSeconds": 30
+  },
+
+  "Clerk": {
+    "Authority": "https://your-app.clerk.accounts.dev",
+    "SecretKey": "sk_test_<clerk secret key>",
+    "Audience": null
+  },
+
+  "Twilio": {
+    "Enabled": false,
+    "AccountSid": "AC<twilio account sid>",
+    "AuthToken": "<twilio auth token>"
+  },
+
+  "Stripe": {
+    "Enabled": false,
+    "SecretKey": "sk_test_<stripe secret key>",
+    "WebhookSecret": "whsec_<stripe webhook signing secret>"
+  }
+}
