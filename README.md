@@ -22,3 +22,25 @@ mercury/
 ├── docker-compose.yml    # Spins up the local PostgreSQL database and dependencies
 ├── mercury_ai_spec.md    # Engineering specification: stack, entities, security rules
 └── README.md
+```
+
+## Backend
+
+Install the .NET SDK version pinned in `global.json` (10.0.401).
+Shared compiler settings are defined in `Directory.Build.props`, including warnings as errors.
+
+* **Mercury.Api**: ASP.NET Core composition root, endpoints, and middleware; references Core and Infrastructure.
+* **Mercury.Core**: Entities, enums, and interfaces; no infrastructure dependencies.
+* **Mercury.Infrastructure**: Home for the future EF Core `AppDbContext`, Twilio client, and Stripe client; references Core.
+* **Mercury.Tests**: xUnit test project; references Api, Core, and Infrastructure. No tests are defined yet.
+
+From the repository root:
+
+```sh
+dotnet build src/backend/Mercury.sln
+dotnet test src/backend/Mercury.sln
+dotnet run --project src/backend/Mercury.Api
+```
+
+Alternatively, run `dotnet build` and `dotnet test` from `src/backend`.
+The scaffold does not yet expose application endpoints.
