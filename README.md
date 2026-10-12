@@ -24,6 +24,48 @@ mercury/
 └── README.md
 ```
 
+## Local Database
+
+PostgreSQL runs in Docker. Requires Docker Desktop (or any Docker Engine with Compose v2).
+
+```sh
+cp .env.example .env     # Windows: Copy-Item .env.example .env
+docker compose up -d
+```
+
+`.env` holds local-only credentials and is git-ignored. `.env.example` is the committed template — never commit a real `.env`.
+
+The first start creates the `mercury` database and the `mercury_app` role, then persists data in the `mercury-postgres-data` volume. The container reports healthy once `pg_isready` succeeds, so dependent services can wait on it.
+
+Connection string for the API, matching the defaults in `.env.example`:
+
+```
+Host=localhost;Port=5432;Database=mercury;Username=mercury_app;Password=local_dev_only_password
+```
+
+Supply it through user secrets rather than committing it to `appsettings.json`:
+
+```sh
+dotnet user-secrets --project src/backend/Mercury.Api set "ConnectionStrings:MercuryDb" "Host=localhost;Port=5432;Database=mercury;Username=mercury_app;Password=local_dev_only_password"
+```
+
+To browse the database, start the optional Adminer container and open http://localhost:8080 (system `PostgreSQL`, server `postgres`):
+
+```sh
+docker compose --profile tools up -d
+```
+
+Useful commands:
+
+```sh
+docker compose ps                         # container status and health
+docker compose logs -f postgres           # follow database logs
+docker compose down                       # stop, keeping data
+docker compose down -v                    # stop and delete all local data
+```
+
+Both ports bind to `127.0.0.1`, so neither the database nor Adminer is reachable from your network.
+
 ## Backend
 
 Install the .NET SDK version pinned in `global.json` (10.0.401).
